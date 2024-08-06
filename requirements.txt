@@ -1,0 +1,8 @@
+numpy
+sympy
+matplotlib
+scipy
+jupyterlab
+ipykernel
+control
+matrepr
