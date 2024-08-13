@@ -35,7 +35,7 @@ def make_input_Toeplitz_matrix(u:MatrixLike, p):
     |  0     0    ...   u[0]  |
 
     Arguments:
-        u -- A px1 block vector
+        u -- A pNx1 block vector, where N is number of input samples.
 
     Keyword Arguments:
         p -- Number of rows per block (default: {1})
@@ -57,7 +57,7 @@ def make_input_Toeplitz_matrix(u:MatrixLike, p):
 
     U = ops.zeros(p*N,N)
     for c in range(0, N):
-        U[0:(c+1)*p,c] = u[0:(c+1)*p].T
+        U[0:(c+1)*p,c] = np.flip(np.squeeze(u[0:(c+1)*p]))
     return U
 
 
@@ -164,7 +164,7 @@ def make_controllability_matrix(A:MatrixLike, B:MatrixLike, t:int=None):# type: 
     S = ops.conc(R, axis=1)
     return S
 
-def make_Hankel_matrix(v:MatrixLike, block_rows:int, p:int=1,q:int=1):
+def make_Hankel_matrix(v:MatrixLike, block_rows:int, c:int=1,r:int=1):
     """Makes a block Hankel matrix from a column block vector.
        A block vector v=(B1 B2 B3 ... Bn) will return a Hankel
        matrix of the form
@@ -180,8 +180,8 @@ def make_Hankel_matrix(v:MatrixLike, block_rows:int, p:int=1,q:int=1):
         block_rows -- number of block rows t
 
     Keyword Arguments:
-        p -- number of columns in blocks (default: {1})
-        q -- number of rows in blocks (default: {1})
+        c -- number of columns in blocks (default: {1})
+        r -- number of rows in blocks (default: {1})
 
     Raises:
         ValueError: If shape of v doesn't match p or q
@@ -197,19 +197,33 @@ def make_Hankel_matrix(v:MatrixLike, block_rows:int, p:int=1,q:int=1):
         v = v.reshape((1,v.shape[0]))
         cols = v.shape[1]
     rows = v.shape[0]
-    if (rows != q) or (cols%p != 0):
-        raise ValueError(f"v must be a column block vector, but given block size qxp=({q},{p}) "+
+    if (rows != r) or (cols%c != 0):
+        raise ValueError(f"v must be a column block vector, but given block size qxp=({r},{c}) "+
                          f"doesn't fit in v with dimensions {v.shape}.")
-    block_cols = int(cols/p)
+    block_cols = int(cols/c)
     if block_rows > block_cols:
         raise ValueError(f"block_rows can't be larger than the number of block " +
                          f"columns in input vector. block_rows={block_rows} and number of block columns={block_cols}")
     T = block_cols - block_rows
-    H = ops.zeros(block_rows*q,(T+1)*p)
+    H = ops.zeros(block_rows*r,(T+1)*c)
 
     for i in range(block_rows):
-        H[i*q:(i+1)*q,:] = v[:,i*p:(i+T+1)*p]
+        H[i*r:(i+1)*r,:] = v[:,i*c:(i+T+1)*c]
     return H
 
-def __compute_SVD(M:MatrixLike):
+def jordan_form(M:MatrixLike):
+    ops = matrix_ops.check_sympy_or_numpy(M)
+    evals, evecs = np.linalg.eig(M)
+    idx = np.argsort(evals)
+    evals, evecs = evals[idx], evecs[:,idx]
+    dups = []
+    for i in range(1,evals.size):
+        if np.isclose(evals[i-1],evals[i], atol=1e-12):
+            evals[i] = evals[i-1]
+            evecs[:,i] = evecs[:,i-1]
+            dups.append(i-1)
+    J = np.diag(evals)
+    for i in dups:
+        J[i,i+1] = 1
     pass
+

@@ -9,27 +9,5 @@ from PIL import Image
 import io
 
 # %% System
-A = np.array([[0,1,0,0],
-              [-0.5,-0.4,0,-0.5],
-              [0,0,0.2,-1],
-              [0,0,0,-0.8]]
-              )
-
-B = np.array(
-    [[0,0],
-     [1,0],
-     [0,0],
-     [0,1]]
-)
-C = np.array(
-    [[1,0,0,0],
-     [0,0,2,1]]
-    )
-D = np.array([[0.0, 0.0], [0.0, 0.0]])
-
-sys = ct.ss(A,B,C,0)
-# %%
-MP = cm.compute_markov_parameters(A,B,C,D, N=10)
-matrepr.mdisplay(MP, title='Markov Parameters')
-H = MP.com
-
+A = np.array([[5,4,2,1],[0,1,-1,-1],[-1,-1,3,0],[1,1,-1,2]])
+cm.jordan_form(A)

@@ -2,8 +2,10 @@
 import sympy as sym
 import numpy as np
 import control_matrices as cm
+import control as ct
 import matplotlib.pyplot as plt
 from scipy.linalg import sqrtm
+from matrepr import mdisplay
 
 # %% System and sim parameters
 A = np.array([[0.5,0,0,0],[0.5,-0.5,0.5,0],[0,0,-0.8,0],[0,0,0,-0.3]])
@@ -18,7 +20,7 @@ n = A.shape[0]
 p = B.shape[1]
 q = C.shape[0]
 
-steps = 140
+steps = 10000
 
 # %% Signals and sim
 u = np.zeros(steps)
@@ -34,12 +36,31 @@ for i in range (1, steps):
     y[i-1] = (C@x[:,i-1])[0] + D*u[i-1]
 y[-1] = (C@x[:,-1])[0] + D*u[-1]
 
+#%% Markov parameter from input-output
+u2 = np.random.uniform(-50,50,steps)
+y2 = np.zeros(steps)
+
+for i in range (1, steps):
+    x[:,i] = A@x[:,i-1] + (B*u2[i-1]).T
+    y2[i-1] = (C@x[:,i-1])[0] + D*u2[i-1]
+y2[-1] = (C@x[:,-1])[0] + D*u2[-1]
+
+Y = y2.reshape((1,y.size))
+U = cm.make_input_Toeplitz_matrix(u2.reshape(u2.size,1),1)
+MP = Y@np.linalg.pinv(U)
+MP_True = cm.compute_markov_parameters(A,B,C, N= 10)
+H0_2 = cm.make_Hankel_matrix(MP[:,1:-1], int(MP.size/2))
+U1, s1 ,Vh1 = np.linalg.svd(H0_2, full_matrices=False)
+mdisplay(MP)
+mdisplay(MP_True)
+mdisplay(s1)
+
 # %% Hankel matrices
 H0 = cm.make_Hankel_matrix(y[1:-1], int(y.size/2))
 H1 = cm.make_Hankel_matrix(y[2:], int(y.size/2))
-# %% Extracting observability and controllability matrix from SVD of H0
+# Extracting observability and controllability matrix from SVD of H0
 U, s ,Vh = np.linalg.svd(H0, full_matrices=False)
-print('Singular Values of H:',s)
+print('Singular Values of H:\n',s)
 s[np.isclose(np.zeros(s.shape),s,)] = 0
 S = np.diag(s)
 
