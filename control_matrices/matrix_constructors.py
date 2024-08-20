@@ -4,11 +4,24 @@ from control_matrices.__matrix_ops import matrix_ops, check_state_space_dimensio
     
 
 def interleave_vectors(*v:MatrixLike):
+    """Interleaves vectors into one row vector. For instance if vectors u, v, w
+    is passed, result will be:
+    res = [u1, v1, w1, u2, v2, w3, u3, v3, w3 ...].T
+
+    Arguments:
+        *v - Input vectors, each passed as one argument.
+
+    Raises:
+        ValueError: If vectors are not of same size, or are not one dimensional.
+
+    Returns:
+        Interleaved output vector.
+    """
     ops = matrix_ops.check_sympy_or_numpy(*v)
     nargs = len(v)
     vecs = []
     vshape = v[0].shape
-    vecs.append( ops.as_row_vector(v[0]))
+    vecs.append(ops.as_row_vector(v[0]))
     retsize = vecs[0].shape[0]
     for i in range(1,nargs):
         if v[i].shape != vshape:
