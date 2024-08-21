@@ -15,9 +15,9 @@ Included are some examples using the library in different ways.
   * System identification using the Ho-Kalman method, where a similar state space is estimated
 using the impulse response of the true system.
 * Deterministic Subspace ID - Method I
+  * System identification using subspace methods. First, the state space variables are estimated
+using oblique projections, whereafter the A, B, C and D matrices are found using linear least squares.
+* Deterministic Subspace ID - Method II
   * System identification using subspace methods. First, the A and C matrices are estimated from
 input-output data using orthogonal projections, whereafter the B and D matrices are found using
 linear least squares.
-* Deterministic Subspace ID - Method I
-  * System identification using subspace methods. First, the state space variables are estimated
-using oblique projections, whereafter the A, B, C and D matrices are found using linear least squares.
