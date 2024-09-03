@@ -1,6 +1,6 @@
 import numpy as np
-from control_matrices.common import MatrixLike
-from control_matrices.__matrix_ops import matrix_ops, check_state_space_dimensions
+from data_driven_control.common import MatrixLike
+from data_driven_control.__matrix_ops import matrix_ops, check_state_space_dimensions
     
 
 def interleave_vectors(*v:MatrixLike):

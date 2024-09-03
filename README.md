@@ -1,8 +1,9 @@
-### Control Matrices
+### Data Driven Control
 # Descripition
-This is a library for creating and handling many of the matrices that one encounter in
-common control problems. In particular, it can handle MIMO systems and the block matrices that
-comes with those.
+This is a library mainly used for data driven control, as a complement to python-control. It has support for
+many of the matrices that one encounter in common control problems. 
+In particular, it can handle MIMO systems and the block matrices that comes with those.
+It also has some support for SISO adaptive control schemes.
 
 Some of the capabilites include (but are not limited to):
 * Make Hankel and Toeplitz matrices from a given block vector.

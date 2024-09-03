@@ -1,6 +1,6 @@
 import numpy as np
 import sympy as sym
-from control_matrices.common import MatrixLike
+from data_driven_control.common import MatrixLike
 from scipy.linalg import sqrtm
 
 def check_state_space_dimensions(A:MatrixLike, B:MatrixLike=None, C:MatrixLike=None, D:MatrixLike=None): # type: ignore
