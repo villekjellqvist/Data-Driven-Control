@@ -1,0 +1,38 @@
+\documentclass[tikz]{standalone}
+
+\usepackage{xfrac}
+\begin{document}
+
+\usetikzlibrary{arrows.meta}
+\usetikzlibrary{positioning} 
+\tikzset{>={Latex[width=2mm,length=2mm]}}
+
+\tikzstyle{block} = [draw, fill=white, rectangle, 
+    minimum height=3em, minimum width=6em,]
+\tikzstyle{sum} = [draw, fill=white, circle]
+\tikzstyle{input} = [coordinate]
+\tikzstyle{output} = [coordinate]
+\tikzstyle{pinstyle} = [pin edge={to-,thin,black}]
+
+\begin{tikzpicture}[auto, node distance=2.5cm]
+    \node[input, name=input] {};
+    \node[block, right of=input] (controller) {$Ru = Tu_c - Sy$};
+    \node[sum, right of=controller] (dsum) {$\Sigma$};
+    \node[block, right of=dsum] (Ho)
+        {$H_o = \frac{z+1.2}{z^2 -z + \sfrac{1}{4}}$};
+    \node[input, above of=dsum, node distance=1.2cm] (v) {};
+    \node[output, right of=Ho] (output) {};
+    \node[coordinate, below of=dsum, node distance=1.5cm] (mid) {};
+    \draw [->] (controller) -- node[name=u] {$u$} (dsum);
+    \draw [->] (dsum) -- (Ho);
+    \draw [->] (v) -- node[name=vv] {$v$} (dsum);
+    \draw [->] (Ho) --node[name=y] {$y$} (output);
+    \draw [-] (y) |- (mid);
+    \draw [->] (mid) -| (controller);
+    \draw [->] (input) -- node[name=uc] {$u_c$} (controller);
+
+
+
+\end{tikzpicture}
+
+\end{document}

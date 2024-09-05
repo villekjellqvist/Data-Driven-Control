@@ -1,6 +1,25 @@
 from numpy import typing as nptyping
 import numpy as np
 
+def checkNumDen(numerator:nptyping.ArrayLike, denominator:nptyping.ArrayLike):
+    num = np.asarray(numerator, dtype=np.float64).squeeze()
+    den = np.asarray(denominator, dtype=np.float64).squeeze()
+    if (num.ndim > 1) or (den.ndim > 1):
+        raise ValueError("num and den must be 1 dimensional arrays.")
+    return num, den
+
+def systemOrder(numerator:nptyping.NDArray, denominator:nptyping.NDArray):
+    if (numerator.ndim > 1) or (denominator.ndim > 1):
+        raise ValueError("num and den must be 1 dimensional arrays.")
+    
+    # Extract model params
+    relorder = denominator.size - numerator.size
+    if relorder < 0:
+        raise ValueError("Numerator order is higher than denominator, system is not causal.")
+    order = denominator.size - 1
+
+    return (order, relorder)
+
 ## % RLS estimator class
 class RLS_Estimator():
     def __init__(self, numerator0:nptyping.ArrayLike, denominator0:nptyping.ArrayLike, ff:float, P0:nptyping.ArrayLike=None, start_delay:int = 0):
@@ -28,19 +47,11 @@ class RLS_Estimator():
             ValueError: _description_
         """
         # Init model
-        self.num = np.asarray(numerator0, dtype=np.float64).squeeze()
-        self.den = np.asarray(denominator0, dtype=np.float64).squeeze()
-        if (self.num.ndim > 1) or (self.den.ndim > 1):
-            raise ValueError("num and den must be 1 dimensional arrays.")
+        self.num, self.den = checkNumDen(numerator0, denominator0)
         
         # Extract model params
-        self.relorder = self.den.size - self.num.size
-        if self.relorder < 0:
-            raise ValueError("Numerator order is higher than denominator, system is not causal.")
-        
-        self.numerator_params = self.num.size
-        self.order = self.den.size - 1
-        self.nr_params = self.order + self.numerator_params
+        self.order, self.relorder = systemOrder(self.num, self.den)
+        self.nr_params = 2*self.order - self.relorder + 1
 
         # Init RLS algo
         self.P = np.eye(self.nr_params)*1000 if P0 is None else np.asarray(P0)
@@ -53,14 +64,13 @@ class RLS_Estimator():
         self.ff = ff
 
         self.phi = np.full((self.nr_params, 1), np.nan)
-        self.u = np.full((self.numerator_params+self.relorder, 1), np.nan)
-        self.y = np.full((self.order+1, 1), np.nan)
+        self.u = np.full((self.order + 1, 1), np.nan)
+        self.y = np.full((self.order + 1, 1), np.nan)
 
         # Init inital estimate if required.
-        if start_delay is None:
-            start_delay = 4*self.order
+        self.startEstimating = False
         self.start_delay = start_delay
-        self.iter = 0
+        self.LS_iter = 0
         if self.start_delay > 0:
             if self.start_delay < self.order + 1:
                 self.start_delay = 0
@@ -71,24 +81,36 @@ class RLS_Estimator():
 
     @property
     def theta(self):
-        return np.concatenate([-self.den[1:], self.num], axis=0).reshape((self.nr_params, 1))
+        return np.concatenate([self.den[1:], self.num], axis=0).reshape((self.nr_params, 1))
     
     @theta.setter
     def theta(self, theta_new:nptyping.ArrayLike):
         theta_new = np.asanyarray(theta_new).squeeze()
         if (theta_new.size != self.nr_params) or (theta_new.ndim != 1):
             raise ValueError("Theta must be a vector with size len(num) + len(den).")
-        self.den[1:] = -theta_new[:self.order]
+        self.den[1:] = theta_new[:self.order]
         self.den[0] = 1
         self.num = theta_new[self.order:]
 
     @property
     def y_hat(self):
-        return (self.phi.T@self.theta)[0,0]
+        return (self.phi.T@self.theta).item() if self.startEstimating else np.nan
+    
+    def __intial_estimate_wait(self, y, u):
+        self.startEstimating = (np.isnan(self.phi).sum() == 0 and self.LS_iter >= self.start_delay)
+        if not self.startEstimating:
+            if self.start_delay > 0:
+                    self.uLS[self.LS_iter] = u
+                    self.yLS[self.LS_iter] = y
+                    if self.LS_iter == self.start_delay-1:
+                        self.__estimate_inital_guess()
+                    self.LS_iter += 1
+        return not self.startEstimating
     
     def __estimate_inital_guess(self):
-        Hu = np.concat([self.uLS[i:-(self.numerator_params-i)] for i in range(0,self.numerator_params)],axis=1)
-        Hy = np.concat([self.yLS[i:-(self.order-i)] for i in range(0,self.order)],axis=1)
+        numerator_params = self.order - self.relorder +1
+        Hu = np.concat([self.uLS[i:-(numerator_params-i)] for i in range(0,numerator_params)],axis=1)
+        Hy = np.concat([-self.yLS[i:-(self.order-i)] for i in range(0,self.order)],axis=1)
         H = np.concat([np.fliplr(Hy), np.fliplr(Hu)], axis=1)
         theta_est = np.linalg.pinv(H)@self.yLS[self.order:]
         self.theta = theta_est
@@ -100,26 +122,59 @@ class RLS_Estimator():
         self.y[1:] = self.y[:-1]
         self.y[0] = y
 
-        self.phi[:self.order] = self.y[1:]
+        self.phi[:self.order] = -self.y[1:]
         self.phi[self.order:] = self.u[self.relorder:]
     
     def update(s, y:float, u:float):
         s.__update_phi(y,u)
         # Don't start before given delay.
-        if np.isnan(s.phi).sum() > 0 or s.iter < s.start_delay:
-            if s.start_delay > 0:
-                s.uLS[s.iter] = u
-                s.yLS[s.iter] = y
-                if s.iter == s.start_delay-1:
-                    s.__estimate_inital_guess()
-                s.iter += 1
-
+        if s.__intial_estimate_wait(y, u):
             return (s.num, s.den)
         
         # RMS
-        s.K = s.P@s.phi / (s.ff + s.phi.T@s.P@s.phi)[0,0]
+        s.K = s.P@s.phi / (s.ff + s.phi.T@s.P@s.phi).item()
         eps = y - s.y_hat
         s.theta = s.theta + s.K*eps
 
         s.P = (np.eye(s.nr_params) - s.K@s.phi.T)@s.P/s.ff
         return (s.num, s.den)
+    
+class TransferFunction():
+    def __init__(self, numerator, denominator):
+        self.num, self.den = checkNumDen(numerator, denominator)
+        self.order, self.relorder = systemOrder(self.num, self.den)
+        self.nr_params = 2*self.order - self.relorder + 1
+
+        # Zero initial conditions
+        self.phi = np.full((self.nr_params, 1), 0, dtype=np.float64)
+        self.u = np.full((self.order + 1, 1), 0, dtype=np.float64)
+        self.y = np.full((self.order, 1), 0, dtype=np.float64)
+
+    @property
+    def tf(self):
+        return(self.num, self.den)
+    
+    @tf.setter
+    def tf(self, num:nptyping.ArrayLike, den:nptyping.ArrayLike):
+        num, den = checkNumDen(num, den)
+        self.num = num
+        self.den = den
+
+    @property
+    def theta(self):
+        return np.concatenate([self.den[1:], self.num], axis=0).reshape((self.nr_params, 1))/self.den[0].item()
+    
+    def __update_phi(self, y:float, u:float):
+        self.u[1:] = self.u[:-1]
+        self.u[0] = u
+        self.y[1:] = self.y[:-1]
+        self.y[0] = y
+
+        self.phi[:self.order] = -self.y
+        self.phi[self.order:] = self.u[self.relorder:]
+
+    def step(self, u):
+        y = (self.phi.T@self.theta).item()
+        self.__update_phi(y, u)
+        return y
+    
