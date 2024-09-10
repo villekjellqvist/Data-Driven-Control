@@ -146,35 +146,71 @@ class TransferFunction():
         self.nr_params = 2*self.order - self.relorder + 1
 
         # Zero initial conditions
-        self.phi = np.full((self.nr_params, 1), 0, dtype=np.float64)
-        self.u = np.full((self.order + 1, 1), 0, dtype=np.float64)
-        self.y = np.full((self.order, 1), 0, dtype=np.float64)
+        self.phi = np.zeros((self.nr_params, 1), dtype=np.float64)
+        self.u = np.zeros((self.order + 1, 1), dtype=np.float64)
+        self.y = np.zeros((self.order, 1), dtype=np.float64)
+
+    def __call__(self, z:float):
+        numorder = self.order - self.relorder
+
+        num = 0
+        for i in range(numorder + 1):
+            num += self.num[i] * z**(numorder - i)
+
+        den = 0 
+        for i in range(self.order + 1):
+            den += self.den[i] * z**(self.order - i)
+        return num/den
+
 
     @property
     def tf(self):
         return(self.num, self.den)
     
     @tf.setter
-    def tf(self, num:nptyping.ArrayLike, den:nptyping.ArrayLike):
-        num, den = checkNumDen(num, den)
+    def tf(self, numden):
+        num, den = checkNumDen(numden[0], numden[1])
         self.num = num
         self.den = den
 
     @property
     def theta(self):
-        return np.concatenate([self.den[1:], self.num], axis=0).reshape((self.nr_params, 1))/self.den[0].item()
+        return np.concatenate([self.den[1:], self.num], axis=0).reshape((self.nr_params, 1))
     
-    def __update_phi(self, y:float, u:float):
+    def __update_u(self, u:float):
         self.u[1:] = self.u[:-1]
         self.u[0] = u
+        self.phi[self.order:] = self.u[self.relorder:]
+    
+    def __update_y(self, y:float):
         self.y[1:] = self.y[:-1]
         self.y[0] = y
-
         self.phi[:self.order] = -self.y
-        self.phi[self.order:] = self.u[self.relorder:]
 
-    def step(self, u):
+    def reset(self):
+        self.phi[:] = 0
+        self.u[:] = 0
+        self.y[:] = 0
+
+    def step(self, u:float):
+        self.__update_u(u)
         y = (self.phi.T@self.theta).item()
-        self.__update_phi(y, u)
+        self.__update_y(y)
         return y
     
+    def __repr__(self) -> str:
+        format = {'float': lambda x: f'{x:.03f}'}
+        return (f'{np.array2string(self.num, formatter=format)}'+
+                f'/{np.array2string(self.den, formatter=format)}')
+    
+    def _repr_latex_(self):
+        numorder = self.order - self.relorder
+        
+        z = lambda p: f'z^{p} + ' if p > 1 else f'z + ' if p == 1 else ''
+        num = ''
+        for i in range(numorder + 1):
+            num += f'{self.num[i]:.03f}' + f'{z(numorder - i)}'
+        den = ''
+        for i in range(self.order + 1):
+            den += f'{self.den[i]:.03f}' +f'{z(self.order - i)}'
+        return fr'$\frac{{ {num} }}{{ {den} }}$'
